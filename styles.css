@@ -1,0 +1,26 @@
+body {
+  background-color: #808080;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.jspsych-content {
+  color: white;
+  text-align: center;
+}
+
+.bubble-occluded img {
+  -webkit-mask-image: radial-gradient(
+    circle 60px at var(--mx, 50%) var(--my, 50%),
+    black 100%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    circle 60px at var(--mx, 50%) var(--my, 50%),
+    black 100%,
+    transparent 100%
+  );
+}

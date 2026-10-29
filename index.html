@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fox vs Lemur Experiment</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="jspsych/jspsych.css">
+</head>
+<body>
+  <script src="jspsych/jspsych.js"></script>
+  <script src="jspsych/plugin-html-keyboard-response.js"></script>
+  <script src="jspsych/plugin-image-keyboard-response.js"></script>
+  <script src="jspsych/plugin-preload.js"></script>
+  <!-- <script src="https://webgazer.cs.brown.edu/webgazer.js"></script> -->
+  <!-- <script src="jspsych/extension-webgazer.js"></script> -->
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyD1•••••••••••••••••••••••••••••••",
+      authDomain: "fox-lemur-experiment.firebaseapp.com",
+      projectId: "fox-lemur-experiment",
+      storageBucket: "fox-lemur-experiment.firebasestorage.app",
+      messagingSenderId: "497375617155",
+      appId: "1:497375617155:web:1af9f9236b209a0b24bbb6"
+    });
+
+    const db = firebase.firestore();
+
+    window.saveToFirebase = async function(data) {
+      try {
+        await db.collection("responses").add(data);
+      } catch(e) {
+        console.error("Firebase error:", e);
+      }
+    };
+  </script>
+
+  <script src="experiment.js"></script>
+</body>
+</html>
