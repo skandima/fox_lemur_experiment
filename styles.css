@@ -14,12 +14,12 @@ body {
 
 .bubble-occluded img {
   -webkit-mask-image: radial-gradient(
-    circle 60px at var(--mx, 50%) var(--my, 50%),
+    circle 120px at var(--mx, 50%) var(--my, 50%),
     black 100%,
     transparent 100%
   );
   mask-image: radial-gradient(
-    circle 60px at var(--mx, 50%) var(--my, 50%),
+    circle 120px at var(--mx, 50%) var(--my, 50%),
     black 100%,
     transparent 100%
   );
