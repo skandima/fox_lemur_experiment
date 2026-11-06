@@ -1,5 +1,5 @@
 const jsPsych = initJsPsych({
-  extensions: [{ type: jsPsychExtensionWebgazer }],
+  extensions: [{ type: jsPsychExtensionSaccade }],
   on_data_update: function(data) {
     if (data.image && window.saveToFirebase) {
       window.saveToFirebase({
@@ -10,8 +10,8 @@ const jsPsych = initJsPsych({
         correct: data.correct,
         rt: data.rt,
         block: data.block,
-        gaze: data.webgazer_data || [],
-        stimulus_rect: (data.webgazer_targets && data.webgazer_targets['#stimulus-container']) || null,
+        gaze: data.saccade_data || [],
+        stimulus_rect: (data.saccade_targets && data.saccade_targets['#stimulus-container']) || null,
         timestamp: new Date().toISOString()
       });
     }
@@ -130,7 +130,7 @@ function makeTrials(blockNum) {
       ${assignedCondition.prompt}
     `,
     choices: ["f", "l"],
-    extensions: [{ type: jsPsychExtensionWebgazer, params: { targets: ['#stimulus-container'] } }],
+    extensions: [{ type: jsPsychExtensionSaccade, params: { targets: ['#stimulus-container'] } }],
     data: { correct_key: correctKey, category, image: img, condition: assignedCondition.label, block: blockNum },
     on_load: () => document.addEventListener('mousemove', handleMouseMove),
     on_finish: function(data) {
@@ -176,33 +176,10 @@ function makeBlock(blockNum) {
 }
 
 const calibrationProcedure = [
-  {
-    type: jsPsychWebgazerInitCamera,
-    instructions: `
-      <p>This experiment uses your webcam to track where you look on the screen.</p>
-      <p>Please allow camera access when prompted.</p>
-      <p>Position your face in the box so it is centered, then press <strong>Space</strong>.</p>
-    `
-  },
-  {
-    type: jsPsychWebgazerCalibrate,
-    calibration_points: [
-      [10, 10], [10, 50], [10, 90],
-      [50, 10], [50, 50], [50, 90],
-      [90, 10], [90, 50], [90, 90]
-    ],
-    calibration_mode: 'click',
-    repetitions_per_point: 3,
-    instructions: '<p>Look directly at each dot and click it.</p>'
-  },
-  {
-    type: jsPsychWebgazerValidate,
-    validation_points: [[25, 25], [25, 75], [75, 25], [75, 75]],
-    roi_radius: 200,
-    time_to_saccade: 1000,
-    validation_duration: 2000,
-    show_validation_data: true
-  }
+  { type: jsPsychSaccadePreview },
+  { type: jsPsychSaccadeTimeSync },
+  { type: jsPsychSaccadeCalibrate },
+  { type: jsPsychSaccadeValidate }
 ];
 
 const welcomeTrial = {
