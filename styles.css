@@ -12,15 +12,55 @@ body {
   text-align: center;
 }
 
-.bubble-occluded img {
+/* Stimulus: full image shown blurred, with a sharp window at the gaze point */
+.stimulus-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.blurred-layer {
+  display: block;
+  max-width: 75vw;
+  max-height: 75vh;
+  filter: blur(10px);
+}
+
+.sharp-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   -webkit-mask-image: radial-gradient(
-    circle 120px at var(--mx, 50%) var(--my, 50%),
-    black 100%,
-    transparent 100%
+    circle at var(--gx, 50%) var(--gy, 50%),
+    black 80px,
+    transparent 180px
   );
   mask-image: radial-gradient(
-    circle 120px at var(--mx, 50%) var(--my, 50%),
-    black 100%,
-    transparent 100%
+    circle at var(--gx, 50%) var(--gy, 50%),
+    black 80px,
+    transparent 180px
   );
+}
+
+.key-prompt {
+  color: white;
+  font-size: 1.4em;
+  margin-top: 16px;
+  letter-spacing: 0.3em;
+}
+
+.feedback {
+  font-size: 5em;
+  margin: 0;
+  line-height: 1;
+}
+
+.feedback.correct {
+  color: #4caf50;
+}
+
+.feedback.incorrect {
+  color: #f44336;
 }

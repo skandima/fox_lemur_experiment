@@ -12,6 +12,7 @@ const jsPsych = initJsPsych({
         block: data.block,
         gaze: data.saccade_data || [],
         stimulus_rect: (data.saccade_targets && data.saccade_targets['#stimulus-container']) || null,
+        swap_keys: data.swap_keys,
         timestamp: new Date().toISOString()
       });
     }
@@ -109,41 +110,65 @@ const CONDITIONS = {
 const conditionKeys = Object.keys(CONDITIONS);
 const assignedCondition = CONDITIONS[conditionKeys[Math.floor(Math.random() * conditionKeys.length)]];
 
+// Counterbalance: randomly swap which category maps to D vs K
+const swapKeys = Math.random() < 0.5;
+const keyA = swapKeys ? "k" : "d";
+const keyB = swapKeys ? "d" : "k";
+
 const MAX_BLOCKS = 1;
 let accuracy = 0;
 
-function handleMouseMove(e) {
-  const container = document.getElementById('stimulus-container');
-  if (!container) return;
-  const rect = container.getBoundingClientRect();
-  container.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100).toFixed(1) + '%');
-  container.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100).toFixed(1) + '%');
-}
-
 function makeTrials(blockNum) {
-  const makeTrial = (img, correctKey, category) => ({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-      <div class="bubble-occluded" id="stimulus-container">
-        <img src="${img}" style="width:400px;height:auto">
-      </div>
-      ${assignedCondition.prompt}
-    `,
-    choices: ["f", "l"],
-    extensions: [{ type: jsPsychExtensionSaccade, params: { targets: ['#stimulus-container'] } }],
-    data: { correct_key: correctKey, category, image: img, condition: assignedCondition.label, block: blockNum },
-    on_load: () => document.addEventListener('mousemove', handleMouseMove),
-    on_finish: function(data) {
-      document.removeEventListener('mousemove', handleMouseMove);
-      data.correct = data.response === data.correct_key;
-    }
-  });
+  const makePair = (img, correctKey, category) => {
+    let stopGaze = null;
 
-  const trials = [
-    ...assignedCondition.imagesA.map(img => makeTrial(img, assignedCondition.keyA, assignedCondition.classA)),
-    ...assignedCondition.imagesB.map(img => makeTrial(img, assignedCondition.keyB, assignedCondition.classB))
+    const imageTrial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div class="stimulus-wrapper" id="stimulus-container">
+          <img class="blurred-layer" src="${img}">
+          <img class="sharp-layer" src="${img}">
+        </div>
+        <p class="key-prompt">D &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; K</p>
+      `,
+      choices: ["d", "k"],
+      extensions: [{ type: jsPsychExtensionSaccade, params: { targets: ['#stimulus-container'] } }],
+      data: { correct_key: correctKey, category, image: img, condition: assignedCondition.label, block: blockNum, swap_keys: swapKeys },
+      on_load: function() {
+        stopGaze = jsPsych.extensions.saccade.onGazeUpdate((g) => {
+          const container = document.getElementById('stimulus-container');
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          container.style.setProperty('--gx', ((g.x - rect.left) / rect.width * 100).toFixed(1) + '%');
+          container.style.setProperty('--gy', ((g.y - rect.top) / rect.height * 100).toFixed(1) + '%');
+        });
+      },
+      on_finish: function(data) {
+        if (stopGaze) stopGaze();
+        data.correct = data.response === data.correct_key;
+      }
+    };
+
+    const feedbackTrial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        const last = jsPsych.data.get().last(1).values()[0];
+        return last && last.correct
+          ? '<p class="feedback correct">✓</p>'
+          : '<p class="feedback incorrect">✗</p>';
+      },
+      choices: "NO_KEYS",
+      trial_duration: 600
+    };
+
+    return [imageTrial, feedbackTrial];
+  };
+
+  const pairs = [
+    ...assignedCondition.imagesA.map(img => makePair(img, keyA, assignedCondition.classA)),
+    ...assignedCondition.imagesB.map(img => makePair(img, keyB, assignedCondition.classB))
   ];
-  return jsPsych.randomization.shuffle(trials);
+  return jsPsych.randomization.shuffle(pairs).flat();
 }
 
 function makeBlock(blockNum) {
@@ -186,8 +211,8 @@ const welcomeTrial = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <p>Welcome to the experiment!</p>
-    <p>You will see images and need to identify which category they belong to.</p>
-    ${assignedCondition.prompt}
+    <p>You will see images. Press <strong>D</strong> or <strong>K</strong> to classify each one.</p>
+    <p>You will get feedback after each response.</p>
     <p>Press any key to begin.</p>
   `,
   choices: "ALL_KEYS"
