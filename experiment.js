@@ -107,130 +107,150 @@ const CONDITIONS = {
   }
 };
 
-const conditionKeys = Object.keys(CONDITIONS);
-const assignedCondition = CONDITIONS[conditionKeys[Math.floor(Math.random() * conditionKeys.length)]];
-
-// Counterbalance: randomly swap which category maps to D vs K
-const swapKeys = Math.random() < 0.5;
-const keyA = swapKeys ? "k" : "d";
-const keyB = swapKeys ? "d" : "k";
-
 const MAX_BLOCKS = 1;
-let accuracy = 0;
 
-function makeTrials(blockNum) {
-  const makePair = (img, correctKey, category) => {
-    let stopGaze = null;
+// Read condition counts from Firebase, assign to least-filled condition, increment atomically
+async function assignConditionBalanced() {
+  const countsRef = db.collection('meta').doc('condition_counts');
+  return db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(countsRef);
+    const counts = doc.exists
+      ? doc.data()
+      : { between: 0, within_fox: 0, within_lemur: 0 };
+    const minCount = Math.min(...Object.values(counts));
+    const tied = Object.keys(counts).filter(k => counts[k] === minCount);
+    const chosen = tied[Math.floor(Math.random() * tied.length)];
+    transaction.set(countsRef, { ...counts, [chosen]: counts[chosen] + 1 });
+    return chosen;
+  });
+}
 
-    const imageTrial = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: `
-        <div class="stimulus-wrapper" id="stimulus-container">
-          <img class="blurred-layer" src="${img}">
-          <img class="sharp-layer" src="${img}">
-        </div>
-        <p class="key-prompt">D &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; K</p>
-      `,
-      choices: ["d", "k"],
-      extensions: [{ type: jsPsychExtensionSaccade, params: { targets: ['#stimulus-container'] } }],
-      data: { correct_key: correctKey, category, image: img, condition: assignedCondition.label, block: blockNum, swap_keys: swapKeys },
-      on_load: function() {
-        stopGaze = jsPsych.extensions.saccade.onGazeUpdate((g) => {
-          const container = document.getElementById('stimulus-container');
-          if (!container) return;
-          const rect = container.getBoundingClientRect();
-          container.style.setProperty('--gx', ((g.x - rect.left) / rect.width * 100).toFixed(1) + '%');
-          container.style.setProperty('--gy', ((g.y - rect.top) / rect.height * 100).toFixed(1) + '%');
-        });
-      },
-      on_finish: function(data) {
-        if (stopGaze) stopGaze();
-        data.correct = data.response === data.correct_key;
-      }
+async function runExperiment() {
+  const conditionLabel = await assignConditionBalanced();
+  const assignedCondition = CONDITIONS[conditionLabel];
+
+  // Counterbalance: randomly swap which category maps to D vs K
+  const swapKeys = Math.random() < 0.5;
+  const keyA = swapKeys ? "k" : "d";
+  const keyB = swapKeys ? "d" : "k";
+
+  let accuracy = 0;
+
+  function makeTrials(blockNum) {
+    const makePair = (img, correctKey, category) => {
+      let stopGaze = null;
+
+      const imageTrial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+          <div class="stimulus-wrapper" id="stimulus-container">
+            <img class="blurred-layer" src="${img}">
+            <img class="sharp-layer" src="${img}">
+          </div>
+          <p class="key-prompt">D &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; K</p>
+        `,
+        choices: ["d", "k"],
+        extensions: [{ type: jsPsychExtensionSaccade, params: { targets: ['#stimulus-container'] } }],
+        data: { correct_key: correctKey, category, image: img, condition: assignedCondition.label, block: blockNum, swap_keys: swapKeys },
+        on_load: function() {
+          stopGaze = jsPsych.extensions.saccade.onGazeUpdate((g) => {
+            const container = document.getElementById('stimulus-container');
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            container.style.setProperty('--gx', ((g.x - rect.left) / rect.width * 100).toFixed(1) + '%');
+            container.style.setProperty('--gy', ((g.y - rect.top) / rect.height * 100).toFixed(1) + '%');
+          });
+        },
+        on_finish: function(data) {
+          if (stopGaze) stopGaze();
+          data.correct = data.response === data.correct_key;
+        }
+      };
+
+      const feedbackTrial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          const last = jsPsych.data.get().last(1).values()[0];
+          return last && last.correct
+            ? '<p class="feedback correct">✓</p>'
+            : '<p class="feedback incorrect">✗</p>';
+        },
+        choices: "NO_KEYS",
+        trial_duration: 600
+      };
+
+      return [imageTrial, feedbackTrial];
     };
 
-    const feedbackTrial = {
+    const pairs = [
+      ...assignedCondition.imagesA.map(img => makePair(img, keyA, assignedCondition.classA)),
+      ...assignedCondition.imagesB.map(img => makePair(img, keyB, assignedCondition.classB))
+    ];
+    return jsPsych.randomization.shuffle(pairs).flat();
+  }
+
+  function makeBlock(blockNum) {
+    const blockStart = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `<p>Block ${blockNum} of ${MAX_BLOCKS}</p><p>Press any key to start.</p>`,
+      choices: "ALL_KEYS"
+    };
+
+    const blockEnd = {
       type: jsPsychHtmlKeyboardResponse,
       stimulus: function() {
-        const last = jsPsych.data.get().last(1).values()[0];
-        return last && last.correct
-          ? '<p class="feedback correct">✓</p>'
-          : '<p class="feedback incorrect">✗</p>';
+        const allData = jsPsych.data.get().values();
+        const blockData = allData.filter(d => d.block === blockNum && d.correct !== undefined);
+        const correct = blockData.filter(d => d.correct).length;
+        accuracy = blockData.length > 0 ? Math.round((correct / blockData.length) * 100) : 0;
+        const done = accuracy >= 90 || blockNum >= MAX_BLOCKS;
+        return done
+          ? `<p>Block ${blockNum} complete! Accuracy: ${accuracy}%</p><p>Press any key to finish.</p>`
+          : `<p>Block ${blockNum} complete! Accuracy: ${accuracy}%</p><p>Press any key for the next block.</p>`;
       },
-      choices: "NO_KEYS",
-      trial_duration: 600
+      choices: "ALL_KEYS"
     };
 
-    return [imageTrial, feedbackTrial];
-  };
+    return {
+      timeline: [blockStart, ...makeTrials(blockNum), blockEnd],
+      conditional_function: () => blockNum === 1 || accuracy < 90
+    };
+  }
 
-  const pairs = [
-    ...assignedCondition.imagesA.map(img => makePair(img, keyA, assignedCondition.classA)),
-    ...assignedCondition.imagesB.map(img => makePair(img, keyB, assignedCondition.classB))
+  const calibrationProcedure = [
+    { type: jsPsychSaccadePreview },
+    { type: jsPsychSaccadeTimeSync },
+    { type: jsPsychSaccadeCalibrate },
+    { type: jsPsychSaccadeValidate }
   ];
-  return jsPsych.randomization.shuffle(pairs).flat();
-}
 
-function makeBlock(blockNum) {
-  const blockStart = {
+  const welcomeTrial = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: `<p>Block ${blockNum} of ${MAX_BLOCKS}</p><p>Press any key to start.</p>`,
+    stimulus: `
+      <p>Welcome to the experiment!</p>
+      <p>You will see images. Press <strong>D</strong> or <strong>K</strong> to classify each one.</p>
+      <p>You will get feedback after each response.</p>
+      <p>Press any key to begin.</p>
+    `,
     choices: "ALL_KEYS"
   };
 
-  const blockEnd = {
+  const endTrial = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-      const allData = jsPsych.data.get().values();
-      const blockData = allData.filter(d => d.block === blockNum && d.correct !== undefined);
-      const correct = blockData.filter(d => d.correct).length;
-      accuracy = blockData.length > 0 ? Math.round((correct / blockData.length) * 100) : 0;
-      const done = accuracy >= 90 || blockNum >= MAX_BLOCKS;
-      return done
-        ? `<p>Block ${blockNum} complete! Accuracy: ${accuracy}%</p><p>Press any key to finish.</p>`
-        : `<p>Block ${blockNum} complete! Accuracy: ${accuracy}%</p><p>Press any key for the next block.</p>`;
-    },
-    choices: "ALL_KEYS"
+    stimulus: `
+      <p>You have completed the experiment. Thank you!</p>
+      <p>Your data has been saved.</p>
+    `,
+    choices: "NO_KEYS"
   };
 
-  return {
-    timeline: [blockStart, ...makeTrials(blockNum), blockEnd],
-    // block 1 always runs; subsequent blocks only run if criterion not yet met
-    conditional_function: () => blockNum === 1 || accuracy < 90
-  };
+  const fullTimeline = [...calibrationProcedure, welcomeTrial];
+  for (let b = 1; b <= MAX_BLOCKS; b++) {
+    fullTimeline.push(makeBlock(b));
+  }
+  fullTimeline.push(endTrial);
+
+  jsPsych.run(fullTimeline);
 }
 
-const calibrationProcedure = [
-  { type: jsPsychSaccadePreview },
-  { type: jsPsychSaccadeTimeSync },
-  { type: jsPsychSaccadeCalibrate },
-  { type: jsPsychSaccadeValidate }
-];
-
-const welcomeTrial = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: `
-    <p>Welcome to the experiment!</p>
-    <p>You will see images. Press <strong>D</strong> or <strong>K</strong> to classify each one.</p>
-    <p>You will get feedback after each response.</p>
-    <p>Press any key to begin.</p>
-  `,
-  choices: "ALL_KEYS"
-};
-
-const endTrial = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: `
-    <p>You have completed the experiment. Thank you!</p>
-    <p>Your data has been saved.</p>
-  `,
-  choices: "NO_KEYS"
-};
-
-const fullTimeline = [...calibrationProcedure, welcomeTrial];
-for (let b = 1; b <= MAX_BLOCKS; b++) {
-  fullTimeline.push(makeBlock(b));
-}
-fullTimeline.push(endTrial);
-
-jsPsych.run(fullTimeline);
+runExperiment();
