@@ -217,13 +217,6 @@ async function runExperiment() {
     };
   }
 
-  const calibrationProcedure = [
-    { type: jsPsychSaccadePreview },
-    { type: jsPsychSaccadeTimeSync },
-    { type: jsPsychSaccadeCalibrate },
-    { type: jsPsychSaccadeValidate }
-  ];
-
   const welcomeTrial = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
@@ -249,7 +242,16 @@ async function runExperiment() {
     fullscreen_mode: true
   };
 
-  const fullTimeline = [fullscreenTrial, ...calibrationProcedure, welcomeTrial];
+  // Camera permission (SaccadePreview) must come before fullscreen —
+  // any browser permission dialog forces an exit from fullscreen
+  const fullTimeline = [
+    { type: jsPsychSaccadePreview },
+    fullscreenTrial,
+    { type: jsPsychSaccadeTimeSync },
+    { type: jsPsychSaccadeCalibrate },
+    { type: jsPsychSaccadeValidate },
+    welcomeTrial
+  ];
   for (let b = 1; b <= MAX_BLOCKS; b++) {
     fullTimeline.push(makeBlock(b));
   }
