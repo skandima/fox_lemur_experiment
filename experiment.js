@@ -249,7 +249,7 @@ async function runExperiment() {
     fullscreen_mode: true
   };
 
-  const fullTimeline = [...calibrationProcedure, welcomeTrial, fullscreenTrial];
+  const fullTimeline = [fullscreenTrial, ...calibrationProcedure, welcomeTrial];
   for (let b = 1; b <= MAX_BLOCKS; b++) {
     fullTimeline.push(makeBlock(b));
   }
