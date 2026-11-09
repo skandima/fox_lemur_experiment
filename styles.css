@@ -16,12 +16,15 @@ body {
 .stimulus-wrapper {
   position: relative;
   display: inline-block;
+  width: 65vmin;
+  height: 65vmin;
 }
 
 .blurred-layer {
   display: block;
-  max-width: 75vw;
-  max-height: 75vh;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   filter: blur(20px);
 }
 
@@ -31,7 +34,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   -webkit-mask-image: radial-gradient(
     circle at var(--gx, 50%) var(--gy, 50%),
     black 80px,
