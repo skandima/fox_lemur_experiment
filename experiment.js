@@ -244,7 +244,12 @@ async function runExperiment() {
     choices: "NO_KEYS"
   };
 
-  const fullTimeline = [...calibrationProcedure, welcomeTrial];
+  const fullscreenTrial = {
+    type: jsPsychFullscreen,
+    fullscreen_mode: true
+  };
+
+  const fullTimeline = [...calibrationProcedure, welcomeTrial, fullscreenTrial];
   for (let b = 1; b <= MAX_BLOCKS; b++) {
     fullTimeline.push(makeBlock(b));
   }

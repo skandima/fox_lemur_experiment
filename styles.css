@@ -22,7 +22,7 @@ body {
   display: block;
   max-width: 75vw;
   max-height: 75vh;
-  filter: blur(10px);
+  filter: blur(20px);
 }
 
 .sharp-layer {
