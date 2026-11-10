@@ -1,5 +1,5 @@
 const jsPsych = initJsPsych({
-  extensions: [{ type: jsPsychExtensionSaccade }],
+  extensions: [{ type: jsPsychExtensionSaccade, params: { smoothing_frames: 5 } }],
   on_data_update: function(data) {
     if (data.image && window.saveToFirebase) {
       window.saveToFirebase({
