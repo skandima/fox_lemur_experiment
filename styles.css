@@ -16,8 +16,8 @@ body {
 .stimulus-wrapper {
   position: relative;
   display: inline-block;
-  width: 65vmin;
-  height: 65vmin;
+  width: min(75vmin, 700px);
+  height: min(75vmin, 700px);
 }
 
 .blurred-layer {
@@ -25,7 +25,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: blur(20px);
+  filter: blur(20px) grayscale(100%);
 }
 
 .sharp-layer {
@@ -35,6 +35,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  filter: grayscale(100%);
   -webkit-mask-image: radial-gradient(
     circle at var(--gx, 50%) var(--gy, 50%),
     black 80px,
